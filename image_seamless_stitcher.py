@@ -1,12 +1,8 @@
 import numpy as np
 import cv2 as cv
-import os
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.join(BASE_DIR, 'data')
 
 
-def resize_for_saving(img, max_width=8000, max_height=8000):
+def resize_for_saving(img, max_width=1920, max_height=1080):
     h, w = img.shape[:2]
     scale = min(max_width / w, max_height / h, 1.0)
     if scale < 1.0:
@@ -87,7 +83,6 @@ def feather_blend(images, masks):
     weight_sum = np.zeros(masks[0].shape, dtype=np.float32)
 
     for img, mask in zip(images, masks):
-        # Distance-to-edge weight gives smoother transitions in overlap regions.
         dist = cv.distanceTransform(mask, cv.DIST_L2, 3)
         weight = np.where(mask > 0, dist + eps, 0).astype(np.float32)
 
@@ -116,14 +111,13 @@ def preserve_center_sharpness(merged, center_img, x, y, edge_width=120):
     return merged
 
 
-# Load three images
-img1 = cv.imread(os.path.join(DATA_DIR, 'image01.jpg'))
-img2 = cv.imread(os.path.join(DATA_DIR, 'image02.jpg'))
-img3 = cv.imread(os.path.join(DATA_DIR, 'image03.jpg'))
+
+img1 = cv.imread('data/image01.jpg')
+img2 = cv.imread('data/image02.jpg')
+img3 = cv.imread('data/image03.jpg')
 assert (img1 is not None) and (img2 is not None) and (img3 is not None), 'Cannot read the given images'
 
-# image01: right, image02: center, image03: left
-# Warp both side images to the center image coordinate system.
+
 H_right_to_center = estimate_homography(img2, img1)
 H_left_to_center = estimate_homography(img2, img3)
 
@@ -156,18 +150,18 @@ img_merged = feather_blend(
     [mask_left, mask_center, mask_right]
 )
 
-# Keep the center image crisp and only blend around its boundary.
 img_merged = preserve_center_sharpness(img_merged, img2, tx, ty, edge_width=120)
 
 img_to_save = resize_for_saving(img_merged)
 
-output_path = os.path.join(DATA_DIR, 'stitched_result.jpg')
+output_path = 'data/stitched_result.jpg'
 saved = cv.imwrite(output_path, img_to_save)
 if not saved:
     raise RuntimeError(f'Failed to write output image: {output_path}')
 
 print(f'Stitched image saved to: {output_path}')
 
-# Show only the final stitched image file.
-if os.name == 'nt':
-    os.startfile(output_path)
+img_to_show = resize_for_saving(img_merged, 1600, 900)
+cv.imshow('Stitched Image', img_to_show)
+cv.waitKey(0)
+cv.destroyAllWindows()
